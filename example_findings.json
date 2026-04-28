@@ -1,0 +1,52 @@
+[
+  {
+    "vuln_type": "xss",
+    "url": "https://app.target.org/search?q=",
+    "parameter": "q",
+    "severity": "medium",
+    "status": "confirmed",
+    "evidence": "Parameter 'q' reflects in response without encoding. alert(1) executed.",
+    "payload": "<script>alert(1)</script>",
+    "notes": "Reflected XSS in search endpoint. No CSP present."
+  },
+  {
+    "vuln_type": "csrf",
+    "url": "https://app.target.org/admin/users/delete",
+    "parameter": null,
+    "severity": "high",
+    "status": "confirmed",
+    "evidence": "No CSRF token on state-changing POST endpoint.",
+    "payload": "",
+    "notes": "Admin delete action has no CSRF protection. SameSite not set."
+  },
+  {
+    "vuln_type": "sqli",
+    "url": "https://app.target.org/api/products",
+    "parameter": "id",
+    "severity": "high",
+    "status": "confirmed",
+    "evidence": "Time-based blind SQLi confirmed: SLEEP(5) caused 5s delay.",
+    "payload": "1' AND SLEEP(5)--",
+    "notes": "MySQL backend confirmed via error. FILE privilege unknown."
+  },
+  {
+    "vuln_type": "info_disclosure",
+    "url": "https://app.target.org/.env",
+    "parameter": null,
+    "severity": "critical",
+    "status": "confirmed",
+    "evidence": "DB_PASSWORD, SECRET_KEY, and AWS_SECRET_ACCESS_KEY exposed in plain text.",
+    "payload": "GET /.env HTTP/1.1",
+    "notes": ".env file publicly accessible. Contains production secrets."
+  },
+  {
+    "vuln_type": "idor",
+    "url": "https://app.target.org/api/users/",
+    "parameter": "id",
+    "severity": "high",
+    "status": "confirmed",
+    "evidence": "Changing user ID in /api/users/{id}/profile returns other users' PII.",
+    "payload": "GET /api/users/1/profile",
+    "notes": "Sequential integer IDs. No server-side access control check."
+  }
+]

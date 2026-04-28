@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "webxploit-chain"
+version = "0.1.0"
+description = "Web exploitation framework for red team engagements — vulnerability chaining, context-aware payloads, engagement reporting"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "WebXploit Chain Contributors" }
+]
+keywords = ["red-team", "penetration-testing", "web-security", "exploitation", "vulnerability-chaining"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "pyyaml>=6.0",
+    "rich>=13.0",         # pretty CLI output
+]
+
+[project.optional-dependencies]
+collab = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "websockets>=12.0",
+]
+graph = [
+    "networkx>=3.2",      # advanced path analysis (optional — engine works without it)
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.9",
+]
+all = ["webxploit-chain[collab,graph,dev]"]
+
+[project.scripts]
+webxploit = "webxploit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["webxploit*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"

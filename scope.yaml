@@ -1,0 +1,23 @@
+# WebXploit Chain — Scope Configuration
+# Save as configs/scope.yaml and reference with: webxploit scope configs/scope.yaml <url>
+
+scope:
+  # Targets explicitly IN scope (supports glob wildcards)
+  allowed:
+    - "app.target.org"
+    - "*.target.org"
+    - "192.168.1.*"
+    - "10.0.0.1/api/*"
+
+  # Targets explicitly OUT of scope (evaluated before allowed)
+  excluded:
+    - "admin.target.org"      # off-limits per contract
+    - "*.cdn.target.org"      # CDN assets — irrelevant
+    - "mail.target.org"
+
+  # strict: true  → anything not in 'allowed' is blocked
+  # strict: false → only 'excluded' items are blocked, everything else passes
+  strict: true
+
+  # Log all scope violations to console and internal violation log
+  log_violations: true
