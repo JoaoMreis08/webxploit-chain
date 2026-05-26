@@ -27,7 +27,6 @@ classifiers = [
 
 dependencies = [
     "pyyaml>=6.0",
-    "rich>=13.0",         # pretty CLI output
 ]
 
 [project.optional-dependencies]
@@ -49,6 +48,9 @@ all = ["webxploit-chain[collab,graph,dev]"]
 
 [project.scripts]
 webxploit = "webxploit.cli:main"
+
+[tool.setuptools]
+py-modules = ["builder", "chain_engine", "cli", "http_automation", "models", "reporter", "scope"]
 
 [tool.setuptools.packages.find]
 where = ["."]

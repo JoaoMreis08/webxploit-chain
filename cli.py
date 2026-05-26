@@ -1,98 +1,274 @@
-"""
-WebXploit Chain CLI — command-line interface for the framework.
-
-Commands:
-  chain     Analyse findings and suggest attack chains
-  report    Generate engagement report (md/html/json)
-  scope     Validate a URL against a scope config
-  payload   Generate payloads for a vuln type
-"""
+"""Command-line interface for WebXploit Chain."""
 
 from __future__ import annotations
 
+import argparse
 import json
+import logging
 import sys
 from pathlib import Path
+from typing import Any, Optional
+
+from builder import Fingerprinter, FingerprintResult, PayloadBuilder, TechStack, WAFType
+from chain_engine import ChainEngine
+from http_automation import HTTPTester, PayloadTestResult
+from models import Engagement, ExploitStatus, Finding, Severity, VulnType
+from reporter import EngagementReporter
+from scope import ScopeEnforcer, ScopeViolation
+
+logger = logging.getLogger(__name__)
 
 
 def _print_banner() -> None:
-    banner = r"""
- ____      ____     _____           _       _ _    ____ _           _
-\ \  \    / / /__  | ____|_  ___ __| | ___ (_) |_ / ___| |__   __ _(_)_ __
- \ \  \  / / / _ \ |  _| \ \/ / '_ \| |/ _ \| | __| |   | '_ \ / _` | | '_ \
-  \ \  \/ / /  __/ | |___ >  <| |_) | | (_) | | |_| |___| | | | (_| | | | | |
-   \_\  /_/  \___| |_____/_/\_\ .__/|_|\___/|_|\__|\____|_| |_|\__,_|_|_| |_|
-                                |_|
-    Web exploitation framework for red team engagements | v0.1.0
-    """
-    print(banner)
+    print(
+        "WebXploit Chain v0.1.0\n"
+        "Authorised web exploitation workflow: fingerprint -> payloads -> chains -> report"
+    )
 
 
-def cmd_chain(args: list[str]) -> None:
-    """Load findings from JSON and run the chaining engine."""
-    from webxploit.core.chain_engine import ChainEngine
-    from webxploit.core.models import Finding, Severity, VulnType, ExploitStatus
+def _parse_header(values: Optional[list[str]]) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for value in values or []:
+        if ":" not in value:
+            raise argparse.ArgumentTypeError(f"Invalid header {value!r}; use 'Name: value'")
+        name, header_value = value.split(":", 1)
+        headers[name.strip()] = header_value.strip()
+    return headers
 
-    if not args:
-        print("Usage: webxploit chain <findings.json>")
-        sys.exit(1)
 
-    findings_path = Path(args[0])
-    if not findings_path.exists():
-        print(f"[!] File not found: {findings_path}")
-        sys.exit(1)
+def _load_scope(path: Optional[str]) -> Optional[ScopeEnforcer]:
+    return ScopeEnforcer.from_yaml(path) if path else None
 
-    raw = json.loads(findings_path.read_text())
+
+def _json_default(value: object) -> str:
+    return str(getattr(value, "value", value))
+
+
+def _print_json(data: object) -> None:
+    print(json.dumps(data, indent=2, default=_json_default))
+
+
+def _console_text(value: object) -> str:
+    return str(value).replace("→", "->").replace("—", "-")
+
+
+def _parse_finding(item: dict[str, Any]) -> Finding:
+    return Finding(
+        vuln_type=VulnType(item["vuln_type"]),
+        url=item["url"],
+        parameter=item.get("parameter"),
+        severity=Severity(item.get("severity", "medium")),
+        status=ExploitStatus(item.get("status", "suspected")),
+        evidence=item.get("evidence", ""),
+        payload=item.get("payload", ""),
+        notes=item.get("notes", ""),
+        cvss_score=item.get("cvss_score"),
+        tags=item.get("tags", []),
+    )
+
+
+def _load_findings(path: Path) -> list[Finding]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    entries = raw.get("findings", []) if isinstance(raw, dict) else raw
     findings: list[Finding] = []
-    for item in raw:
+    for item in entries:
         try:
-            f = Finding(
-                vuln_type=VulnType(item["vuln_type"]),
-                url=item["url"],
-                parameter=item.get("parameter"),
-                severity=Severity(item.get("severity", "medium")),
-                evidence=item.get("evidence", ""),
-                payload=item.get("payload", ""),
-                notes=item.get("notes", ""),
-                status=ExploitStatus(item.get("status", "suspected")),
-            )
-            findings.append(f)
-        except (KeyError, ValueError) as e:
-            print(f"[!] Skipping invalid finding entry: {e}")
+            findings.append(_parse_finding(item))
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("Skipping invalid finding entry: %s", exc)
+    return findings
 
+
+def _fingerprint_to_dict(result: FingerprintResult, url: str) -> dict[str, object]:
+    return {
+        "url": url,
+        "stack": result.stack.value,
+        "waf": result.waf.value,
+        "confidence": result.confidence,
+        "indicators": result.indicators,
+    }
+
+
+def cmd_fingerprint(args: argparse.Namespace) -> int:
+    tester = HTTPTester(
+        scope_enforcer=_load_scope(args.scope),
+        timeout=args.timeout,
+    )
+    try:
+        response = tester.fetch(
+            args.url,
+            method=args.method,
+            body=args.body,
+            headers=_parse_header(args.header),
+        )
+    except ScopeViolation as exc:
+        print(f"[-] OUT OF SCOPE: {_console_text(exc)}", file=sys.stderr)
+        return 2
+    except Exception as exc:
+        print(f"[!] Request failed: {exc}", file=sys.stderr)
+        return 1
+
+    result = Fingerprinter().fingerprint(
+        url=response.url,
+        headers=response.headers,
+        body=response.body,
+        status_code=str(response.status_code),
+    )
+    if args.json:
+        data = _fingerprint_to_dict(result, response.url)
+        data["status_code"] = response.status_code
+        data["elapsed"] = round(response.elapsed, 3)
+        _print_json(data)
+        return 0
+
+    print(f"[+] {response.url}")
+    print(f"    Status: {response.status_code} ({response.elapsed:.2f}s)")
+    print(f"    Stack: {result.stack.value}")
+    print(f"    WAF: {result.waf.value}")
+    print(f"    Confidence: {result.confidence:.0%}")
+    for indicator in result.indicators:
+        print(f"    - {indicator}")
+    return 0
+
+
+def cmd_generate(args: argparse.Namespace) -> int:
+    vuln_value = args.vuln or (args.legacy[0] if args.legacy else None)
+    waf_value = args.waf or (args.legacy[1] if len(args.legacy) > 1 else None)
+    if not vuln_value:
+        print("[!] Missing vuln type. Use: webxploit generate --vuln xss", file=sys.stderr)
+        return 1
+
+    try:
+        vuln = VulnType(vuln_value.lower())
+        fingerprint = FingerprintResult(
+            stack=TechStack(args.stack) if args.stack else TechStack.UNKNOWN,
+            waf=WAFType(waf_value) if waf_value else WAFType.UNKNOWN,
+        )
+    except ValueError as exc:
+        print(f"[!] Invalid generate option: {exc}", file=sys.stderr)
+        return 1
+
+    result = PayloadBuilder().build(
+        vuln,
+        fingerprint=fingerprint,
+        include_encodings=not args.no_encodings,
+        max_payloads=args.max_payloads,
+    )
+    if args.json:
+        _print_json(
+            {
+                "vuln_type": result.vuln_type.value,
+                "stack": result.stack.value,
+                "waf": result.waf.value,
+                "payloads": result.payloads,
+                "encoded": result.encoded,
+            }
+        )
+        return 0
+
+    print(f"[*] Payloads for {vuln.value.upper()} (stack={result.stack.value}, waf={result.waf.value})")
+    if not result.payloads:
+        print("[~] No payloads available for this vulnerability type.")
+        return 0
+    for index, payload in enumerate(result.payloads, 1):
+        print(f"{index:2d}. {payload}")
+    if args.show_encodings:
+        for encoding, payloads in result.encoded.items():
+            print(f"\n[{encoding}]")
+            for payload in payloads:
+                print(f"  {payload}")
+    return 0
+
+
+def cmd_test(args: argparse.Namespace) -> int:
+    tester = HTTPTester(scope_enforcer=_load_scope(args.scope), timeout=args.timeout)
+    try:
+        result = tester.test_payload(
+            url=args.url,
+            payload=args.payload,
+            parameter=args.param,
+            method=args.method,
+            expected=args.expect,
+            headers=_parse_header(args.header),
+        )
+    except ScopeViolation as exc:
+        print(f"[-] OUT OF SCOPE: {_console_text(exc)}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        _print_json(result.to_dict())
+        return 0 if not result.error else 1
+
+    _print_test_result(result)
+    return 0 if not result.error else 1
+
+
+def _print_test_result(result: PayloadTestResult) -> None:
+    if result.error:
+        print(f"[!] Test failed: {result.error}")
+        return
+    print(f"[*] {result.method} {result.url}")
+    print(f"    Status: {result.status_code} ({result.elapsed:.2f}s)")
+    print(f"    Result: {'POTENTIAL HIT' if result.success else 'no clear signal'}")
+    for indicator in result.indicators:
+        print(f"    - {indicator}")
+    if result.response_excerpt:
+        print("    Response excerpt:")
+        print(result.response_excerpt.replace("\n", "\\n")[:300])
+
+
+def cmd_chain(args: argparse.Namespace) -> int:
+    path = Path(args.findings)
+    if not path.exists():
+        print(f"[!] File not found: {path}", file=sys.stderr)
+        return 1
+    findings = _load_findings(path)
     if not findings:
-        print("[!] No valid findings loaded.")
-        sys.exit(1)
+        print("[!] No valid findings loaded.", file=sys.stderr)
+        return 1
 
-    print(f"[*] Loaded {len(findings)} findings. Running chain engine...\n")
-    engine = ChainEngine()
-    results = engine.analyse(findings)
+    results = ChainEngine(max_depth=args.max_depth).analyse(
+        findings,
+        min_confidence=args.min_confidence,
+    )
+    if args.json:
+        _print_json(
+            [
+                {
+                    "chain": result.chain.to_dict(),
+                    "score": result.score,
+                    "confidence": result.confidence,
+                    "reasoning": result.reasoning,
+                }
+                for result in results
+            ]
+        )
+        return 0
 
+    print(f"[*] Loaded {len(findings)} findings. Running chain engine...")
     if not results:
         print("[~] No chains identified with current findings.")
-        return
-
+        return 0
     print(f"[+] {len(results)} chain(s) identified:\n")
-    for i, r in enumerate(results, 1):
-        print(f"  {i}. {r.chain.chain_label}")
-        print(f"     Score: {r.score:.2f}  |  Confidence: {r.confidence:.0%}  |  Severity: {r.chain.severity.value}")
-        print(f"     {r.reasoning[:120]}...")
-        print()
+    for index, result in enumerate(results, 1):
+        print(f"{index}. {_console_text(result.chain.chain_label)}")
+        print(
+            f"   Score: {result.score:.2f} | Confidence: {result.confidence:.0%} | "
+            f"Severity: {result.chain.severity.value}"
+        )
+        print(f"   {_console_text(result.reasoning)}\n")
+    return 0
 
 
-def cmd_report(args: list[str]) -> None:
-    """Generate a report from an engagement JSON file."""
-    from webxploit.core.models import Engagement, Finding, VulnChain, Severity, VulnType, ExploitStatus
-    from webxploit.reporting.reporter import EngagementReporter
+def cmd_report(args: argparse.Namespace) -> int:
+    path = Path(args.engagement)
+    if not path.exists():
+        print(f"[!] File not found: {path}", file=sys.stderr)
+        return 1
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, list):
+        raw = {"name": path.stem, "findings": raw}
 
-    if not args:
-        print("Usage: webxploit report <engagement.json> [output_dir]")
-        sys.exit(1)
-
-    eng_path = Path(args[0])
-    out_dir  = args[1] if len(args) > 1 else "reports"
-
-    raw = json.loads(eng_path.read_text())
     engagement = Engagement(
         name=raw.get("name", "Unnamed Engagement"),
         scope=raw.get("scope", []),
@@ -100,102 +276,97 @@ def cmd_report(args: list[str]) -> None:
         operator=raw.get("operator", "unknown"),
         notes=raw.get("notes", ""),
     )
-    for item in raw.get("findings", []):
-        try:
-            engagement.add_finding(Finding(
-                vuln_type=VulnType(item["vuln_type"]),
-                url=item["url"],
-                parameter=item.get("parameter"),
-                severity=Severity(item.get("severity", "medium")),
-                evidence=item.get("evidence", ""),
-                payload=item.get("payload", ""),
-                notes=item.get("notes", ""),
-                status=ExploitStatus(item.get("status", "suspected")),
-            ))
-        except (KeyError, ValueError) as e:
-            print(f"[!] Skipping finding: {e}")
+    for finding in _load_findings(path):
+        engagement.add_finding(finding)
+    if args.include_chains:
+        for result in ChainEngine().analyse(engagement.findings):
+            engagement.add_chain(result.chain)
 
-    reporter = EngagementReporter(engagement)
-    paths = reporter.save_all(out_dir)
-    print(f"[+] Reports saved:")
-    for fmt, p in paths.items():
-        print(f"    {fmt.upper():5s} → {p}")
+    paths = EngagementReporter(engagement).save_all(args.output_dir)
+    print("[+] Reports saved:")
+    for fmt, report_path in paths.items():
+        print(f"    {fmt.upper():5s} -> {report_path}")
+    return 0
 
 
-def cmd_scope(args: list[str]) -> None:
-    """Check if a URL is in scope."""
-    from webxploit.core.scope import ScopeEnforcer, ScopeViolation
-
-    if len(args) < 2:
-        print("Usage: webxploit scope <scope.yaml> <url>")
-        sys.exit(1)
-
-    enforcer = ScopeEnforcer.from_yaml(args[0])
-    url = args[1]
+def cmd_scope(args: argparse.Namespace) -> int:
     try:
-        enforcer.check(url)
-        print(f"[+] IN SCOPE: {url}")
-    except ScopeViolation as e:
-        print(f"[-] OUT OF SCOPE: {e}")
+        ScopeEnforcer.from_yaml(args.scope).check(args.url)
+    except ScopeViolation as exc:
+        print(f"[-] OUT OF SCOPE: {_console_text(exc)}")
+        return 2
+    print(f"[+] IN SCOPE: {args.url}")
+    return 0
 
 
-def cmd_payload(args: list[str]) -> None:
-    """Generate payloads for a vulnerability type."""
-    from webxploit.core.models import VulnType
-    from webxploit.payloads.builder import PayloadBuilder, WAFType
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="webxploit")
+    parser.add_argument("--debug", action="store_true", help="enable debug logging")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-    if not args:
-        types = ", ".join(v.value for v in VulnType)
-        print(f"Usage: webxploit payload <vuln_type> [waf_type]\nTypes: {types}")
-        sys.exit(1)
+    fp = subparsers.add_parser("fingerprint", help="fetch URL and detect stack/WAF")
+    fp.add_argument("url")
+    fp.add_argument("--method", default="GET", choices=["GET", "POST"])
+    fp.add_argument("--body")
+    fp.add_argument("--header", action="append", help="HTTP header as 'Name: value'")
+    fp.add_argument("--scope")
+    fp.add_argument("--timeout", type=float, default=10.0)
+    fp.add_argument("--json", action="store_true")
+    fp.set_defaults(func=cmd_fingerprint)
 
-    try:
-        vuln = VulnType(args[0].lower())
-    except ValueError:
-        print(f"[!] Unknown vuln type: {args[0]}")
-        sys.exit(1)
+    gen = subparsers.add_parser("generate", aliases=["payload"], help="generate payloads")
+    gen.add_argument("legacy", nargs="*", help=argparse.SUPPRESS)
+    gen.add_argument("--vuln")
+    gen.add_argument("--waf", choices=[w.value for w in WAFType])
+    gen.add_argument("--stack", choices=[s.value for s in TechStack])
+    gen.add_argument("--max-payloads", type=int, default=10)
+    gen.add_argument("--no-encodings", action="store_true")
+    gen.add_argument("--show-encodings", action="store_true")
+    gen.add_argument("--json", action="store_true")
+    gen.set_defaults(func=cmd_generate)
 
-    waf = WAFType.NONE
-    if len(args) > 1:
-        try:
-            waf = WAFType(args[1].lower())
-        except ValueError:
-            print(f"[!] Unknown WAF type: {args[1]} — using NONE")
+    tst = subparsers.add_parser("test", help="send one payload and inspect response")
+    tst.add_argument("--url", required=True)
+    tst.add_argument("--payload", required=True)
+    tst.add_argument("--param")
+    tst.add_argument("--method", default="GET", choices=["GET", "POST"])
+    tst.add_argument("--expect")
+    tst.add_argument("--header", action="append")
+    tst.add_argument("--scope")
+    tst.add_argument("--timeout", type=float, default=10.0)
+    tst.add_argument("--json", action="store_true")
+    tst.set_defaults(func=cmd_test)
 
-    builder = PayloadBuilder()
-    result = builder.build(vuln)
-    print(f"\n[*] Payloads for {vuln.value.upper()} (WAF: {waf.value}):\n")
-    for i, p in enumerate(result.payloads, 1):
-        print(f"  {i:2d}. {p}")
-    print()
+    chain = subparsers.add_parser("chain", help="analyse findings and suggest chains")
+    chain.add_argument("findings")
+    chain.add_argument("--min-confidence", type=float, default=0.5)
+    chain.add_argument("--max-depth", type=int, default=4)
+    chain.add_argument("--json", action="store_true")
+    chain.set_defaults(func=cmd_chain)
+
+    report = subparsers.add_parser("report", help="generate engagement reports")
+    report.add_argument("engagement")
+    report.add_argument("output_dir", nargs="?", default="reports")
+    report.add_argument("--include-chains", action="store_true")
+    report.set_defaults(func=cmd_report)
+
+    scope = subparsers.add_parser("scope", help="validate URL against scope.yaml")
+    scope.add_argument("scope")
+    scope.add_argument("url")
+    scope.set_defaults(func=cmd_scope)
+    return parser
 
 
-def main() -> None:
-    _print_banner()
-    if len(sys.argv) < 2:
-        print("Commands: chain | report | scope | payload\n")
-        print("  chain   <findings.json>              — analyse findings for chains")
-        print("  report  <engagement.json> [out_dir]  — generate MD/HTML/JSON report")
-        print("  scope   <scope.yaml> <url>           — check if URL is in scope")
-        print("  payload <vuln_type> [waf_type]       — generate payloads\n")
-        sys.exit(0)
-
-    command = sys.argv[1].lower()
-    rest    = sys.argv[2:]
-
-    dispatch = {
-        "chain":   cmd_chain,
-        "report":  cmd_report,
-        "scope":   cmd_scope,
-        "payload": cmd_payload,
-    }
-
-    fn = dispatch.get(command)
-    if fn is None:
-        print(f"[!] Unknown command: {command!r}")
-        sys.exit(1)
-    fn(rest)
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.ERROR,
+        format="%(levelname)s: %(message)s",
+    )
+    return int(args.func(args))
 
 
 if __name__ == "__main__":
-    main()
+    _print_banner()
+    raise SystemExit(main())

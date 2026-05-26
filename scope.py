@@ -175,7 +175,7 @@ class ScopeEnforcer:
         return self._matches_any(target, self.config.excluded)
 
     def _violation(self, url: str, reason: str) -> bool:
-        msg = f"[SCOPE VIOLATION] {url!r} — {reason}"
+        msg = f"[SCOPE VIOLATION] {url!r} - {reason}"
         if self.config.log_violations:
             logger.warning(msg)
             self._violation_log.append(msg)
