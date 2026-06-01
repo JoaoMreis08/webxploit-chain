@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def test_imports():
     """Test that core modules can be imported."""
-    from webxploit.core.models import Finding, VulnType, Severity
+    from webxploit.core.models import Finding, VulnType
     from webxploit.core.chain_engine import ChainEngine
     from webxploit.payloads.builder import PayloadBuilder
 
