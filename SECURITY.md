@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in WebXploit Chain, **please do not open a public issue**. Instead:
 
-1. **Email** the vulnerability details to: `opensource@webxploit-chain.local`
+1. **Email** the vulnerability details to: `08.joao.r.04@gmail.com`
 2. **Include**:
    - Description of the vulnerability
    - Affected versions
