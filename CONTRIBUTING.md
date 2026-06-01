@@ -145,8 +145,8 @@ Prefix with: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `ci:`, `chore:`
 
 - Check existing [issues](https://github.com/webxploit-chain/webxploit-chain/issues)
 - Open a [discussion](https://github.com/webxploit-chain/webxploit-chain/discussions)
-- Email: opensource@webxploit-chain.local
+- Email: 08.joao.r.04@gmail.com
 
 ---
 
-**Thank you for contributing! 🚀**
+**Thank you for contributing!**
