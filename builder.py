@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import random
 import re
 import urllib.parse
 from dataclasses import dataclass, field

@@ -1,0 +1,10 @@
+allowed:
+  - "app.acme.com"
+  - "api.acme.com"
+  - "admin.acme.com"
+  - "*.acme.com"
+
+excluded:
+  - "internal.acme.com"
+  - "dev.acme.com"
+  - "staging.acme.com"

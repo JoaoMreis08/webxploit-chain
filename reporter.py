@@ -21,7 +21,6 @@ import json
 import textwrap
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from webxploit.core.models import Engagement, Finding, Severity, VulnChain
 

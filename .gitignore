@@ -1,8 +1,52 @@
+# Virtual environments
 venv/
+env/
+ENV/
+.venv
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+.project
+.pydevproject
+.settings/
+
+# Environment & Secrets
 .env
+.env.local
+.env.*.local
+secrets.yaml
+credentials.json
+
+# Reports & Outputs
 reports/
+output/
+*.html
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

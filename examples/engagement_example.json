@@ -1,0 +1,66 @@
+{
+  "name": "ACME Corp - Q2 2026 Web Assessment",
+  "scope": ["app.acme.com", "api.acme.com", "admin.acme.com"],
+  "exclusions": ["internal.acme.com"],
+  "operator": "security_team",
+  "notes": "Comprehensive web application security assessment",
+  "findings": [
+    {
+      "vuln_type": "xss",
+      "url": "https://app.acme.com/search",
+      "parameter": "q",
+      "severity": "high",
+      "status": "confirmed",
+      "evidence": "Reflected XSS in search parameter - payload echoed without encoding",
+      "payload": "<img src=x onerror=alert(document.domain)>",
+      "notes": "Can steal session cookies via this vector",
+      "cvss_score": 6.1,
+      "tags": ["reflection", "user-input", "critical"]
+    },
+    {
+      "vuln_type": "auth_bypass",
+      "url": "https://api.acme.com/admin",
+      "severity": "critical",
+      "status": "confirmed",
+      "evidence": "API returns full admin data when X-Admin-Bypass header is present",
+      "payload": "X-Admin-Bypass: true",
+      "notes": "Allows unauthorized access to sensitive endpoints",
+      "cvss_score": 9.1,
+      "tags": ["api", "auth", "critical"]
+    },
+    {
+      "vuln_type": "info_disclosure",
+      "url": "https://app.acme.com/api/v1/users",
+      "parameter": "id",
+      "severity": "medium",
+      "status": "confirmed",
+      "evidence": "User enumeration possible - sequential ID in response reveals total users",
+      "payload": "1, 2, 3, ...",
+      "notes": "Can be used to identify valid user IDs for targeted attacks",
+      "cvss_score": 5.3,
+      "tags": ["enumeration", "api"]
+    },
+    {
+      "vuln_type": "csrf",
+      "url": "https://app.acme.com/settings/change-email",
+      "severity": "medium",
+      "status": "suspected",
+      "evidence": "POST endpoint lacks CSRF token validation",
+      "notes": "Can be exploited to change user email via social engineering",
+      "cvss_score": 4.3,
+      "tags": ["state-change"]
+    },
+    {
+      "vuln_type": "sqli",
+      "url": "https://app.acme.com/reports",
+      "parameter": "date",
+      "severity": "critical",
+      "status": "confirmed",
+      "evidence": "Database error messages reveal structure; time-based SQL injection confirmed",
+      "payload": "1' AND SLEEP(5)--",
+      "notes": "Allows full database extraction",
+      "cvss_score": 9.8,
+      "tags": ["database", "time-based", "critical"]
+    }
+  ]
+}

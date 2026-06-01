@@ -6,6 +6,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
+## Table of Contents
+
+- [What is WebXploit Chain?](#what-is-webxploit-chain)
+- [Why not just use Burp Suite / Metasploit?](#why-not-just-use-burp-suite--metasploit)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Python API](#python-api)
+- [Contributing](#contributing)
+- [License](#license)
+
 ---
 
 ## What is WebXploit Chain?
@@ -34,7 +44,7 @@ Most web security tools treat vulnerabilities in isolation — a scanner finds X
 ## Installation
 
 ```bash
-git clone https://github.com/youruser/webxploit-chain.git
+git clone https://github.com/webxploit-chain/webxploit-chain.git
 cd webxploit-chain
 pip install -e .
 

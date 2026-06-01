@@ -1,0 +1,36 @@
+# Line endings
+* text=auto
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+*.gz binary
+
+# IDE files
+.vscode/** export-ignore
+.idea/** export-ignore
+.DS_Store export-ignore
+
+# CI/CD
+.github/** export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+
+# Generated/temporary
+__pycache__/ export-ignore
+*.pyc export-ignore
+.pytest_cache/ export-ignore
+build/ export-ignore
+dist/ export-ignore
+*.egg-info/ export-ignore
