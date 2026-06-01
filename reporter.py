@@ -31,35 +31,35 @@ from webxploit.core.models import Engagement, Finding, Severity, VulnChain
 
 _CVSS_REFERENCE = {
     Severity.CRITICAL: "9.0–10.0",
-    Severity.HIGH:     "7.0–8.9",
-    Severity.MEDIUM:   "4.0–6.9",
-    Severity.LOW:      "0.1–3.9",
-    Severity.INFO:     "0.0",
+    Severity.HIGH: "7.0–8.9",
+    Severity.MEDIUM: "4.0–6.9",
+    Severity.LOW: "0.1–3.9",
+    Severity.INFO: "0.0",
 }
 
 _SEVERITY_EMOJI = {
     Severity.CRITICAL: "🔴",
-    Severity.HIGH:     "🟠",
-    Severity.MEDIUM:   "🟡",
-    Severity.LOW:      "🔵",
-    Severity.INFO:     "⚪",
+    Severity.HIGH: "🟠",
+    Severity.MEDIUM: "🟡",
+    Severity.LOW: "🔵",
+    Severity.INFO: "⚪",
 }
 
 _REMEDIATION_HINTS: dict[str, str] = {
-    "xss":             "Encode all user-supplied output using context-aware escaping (HTML, JS, CSS, URL). Implement a strict Content Security Policy.",
-    "sqli":            "Use parameterised queries or prepared statements exclusively. Apply the principle of least privilege to database accounts.",
-    "csrf":            "Implement synchronised CSRF tokens or SameSite=Strict cookies for all state-changing operations.",
-    "ssrf":            "Validate and allowlist destination URLs server-side. Disable unnecessary URL-fetching functionality. Segment internal networks.",
-    "idor":            "Implement object-level access control checks on every request. Avoid exposing internal sequential IDs; use UUIDs.",
-    "lfi":             "Never pass user input to file-system functions. If unavoidable, whitelist allowed paths strictly.",
-    "rce":             "Eliminate any user-controlled input in OS command calls. Use language-level APIs instead of shell calls.",
-    "auth_bypass":     "Enforce authentication checks server-side for every sensitive endpoint. Review token/session validation logic.",
+    "xss": "Encode all user-supplied output using context-aware escaping (HTML, JS, CSS, URL). Implement a strict Content Security Policy.",
+    "sqli": "Use parameterised queries or prepared statements exclusively. Apply the principle of least privilege to database accounts.",
+    "csrf": "Implement synchronised CSRF tokens or SameSite=Strict cookies for all state-changing operations.",
+    "ssrf": "Validate and allowlist destination URLs server-side. Disable unnecessary URL-fetching functionality. Segment internal networks.",
+    "idor": "Implement object-level access control checks on every request. Avoid exposing internal sequential IDs; use UUIDs.",
+    "lfi": "Never pass user input to file-system functions. If unavoidable, whitelist allowed paths strictly.",
+    "rce": "Eliminate any user-controlled input in OS command calls. Use language-level APIs instead of shell calls.",
+    "auth_bypass": "Enforce authentication checks server-side for every sensitive endpoint. Review token/session validation logic.",
     "info_disclosure": "Remove debug endpoints, stack traces, and verbose error messages from production. Rotate any exposed credentials immediately.",
-    "ssti":            "Use sandboxed template engines. Avoid passing user input into template rendering functions.",
-    "open_redirect":   "Validate redirect URLs against a strict allowlist. Reject relative or external redirect targets.",
+    "ssti": "Use sandboxed template engines. Avoid passing user input into template rendering functions.",
+    "open_redirect": "Validate redirect URLs against a strict allowlist. Reject relative or external redirect targets.",
     "privilege_escalation": "Enforce server-side role checks on every privileged action. Do not rely on client-supplied role parameters.",
     "deserialisation": "Avoid deserialising untrusted data. If unavoidable, sign serialised payloads and use a type allowlist.",
-    "xxe":             "Disable XML external entity processing in all XML parsers. Use less complex data formats (JSON) where possible.",
+    "xxe": "Disable XML external entity processing in all XML parsers. Use less complex data formats (JSON) where possible.",
 }
 
 
@@ -67,8 +67,8 @@ _REMEDIATION_HINTS: dict[str, str] = {
 # Markdown report generator
 # ---------------------------------------------------------------------------
 
-class MarkdownReporter:
 
+class MarkdownReporter:
     def generate(self, engagement: Engagement) -> str:
         sections = [
             self._header(engagement),
@@ -103,7 +103,8 @@ class MarkdownReporter:
         by_sev = e.findings_by_severity
         rows = "\n".join(
             f"| {_SEVERITY_EMOJI[Severity(sev)]} {sev.capitalize()} | {len(findings)} |"
-            for sev, findings in by_sev.items() if findings
+            for sev, findings in by_sev.items()
+            if findings
         )
         return textwrap.dedent(f"""\
             ## Executive Summary
@@ -122,7 +123,7 @@ class MarkdownReporter:
 
     def _scope_section(self, e: Engagement) -> str:
         scope_list = "\n".join(f"- `{s}`" for s in e.scope) or "_No scope defined._"
-        excl_list  = "\n".join(f"- `{s}`" for s in e.exclusions) or "_None._"
+        excl_list = "\n".join(f"- `{s}`" for s in e.exclusions) or "_None._"
         return textwrap.dedent(f"""\
             ## Scope & Methodology
 
@@ -162,7 +163,7 @@ class MarkdownReporter:
             | Field     | Value              |
             |-----------|--------------------|
             | URL       | `{f.url}`          |
-            | Parameter | `{f.parameter or 'N/A'}` |
+            | Parameter | `{f.parameter or "N/A"}` |
             | Status    | {f.status.value}   |
             | {cvss_key} | {cvss_val} |
 
@@ -178,8 +179,10 @@ class MarkdownReporter:
     def _chains_section(self, e: Engagement) -> str:
         if not e.chains:
             return ""
-        blocks = ["## Attack Chains\n",
-                  "_The following multi-step attack paths were identified, ordered by severity._\n"]
+        blocks = [
+            "## Attack Chains\n",
+            "_The following multi-step attack paths were identified, ordered by severity._\n",
+        ]
         for i, chain in enumerate(e.chains, 1):
             blocks.append(self._chain_block(i, chain))
         return "\n".join(blocks)
@@ -236,6 +239,7 @@ class MarkdownReporter:
 # HTML report generator (wraps the Markdown output)
 # ---------------------------------------------------------------------------
 
+
 class HTMLReporter:
     """Generates a self-contained HTML report with inline CSS."""
 
@@ -280,14 +284,15 @@ class HTMLReporter:
 # JSON reporter
 # ---------------------------------------------------------------------------
 
+
 class JSONReporter:
     def generate(self, engagement: Engagement) -> str:
         data = {
             "engagement": engagement.summary(),
-            "scope":      engagement.scope,
-            "findings":   [f.to_dict() for f in engagement.findings],
-            "chains":     [c.to_dict() for c in engagement.chains],
-            "generated":  datetime.utcnow().isoformat(),
+            "scope": engagement.scope,
+            "findings": [f.to_dict() for f in engagement.findings],
+            "chains": [c.to_dict() for c in engagement.chains],
+            "generated": datetime.utcnow().isoformat(),
         }
         return json.dumps(data, indent=2, default=str)
 
@@ -295,6 +300,7 @@ class JSONReporter:
 # ---------------------------------------------------------------------------
 # Unified reporter
 # ---------------------------------------------------------------------------
+
 
 class EngagementReporter:
     """
@@ -310,7 +316,7 @@ class EngagementReporter:
 
     def __init__(self, engagement: Engagement) -> None:
         self.engagement = engagement
-        self._md   = MarkdownReporter()
+        self._md = MarkdownReporter()
         self._html = HTMLReporter()
         self._json = JSONReporter()
 
@@ -328,7 +334,11 @@ class EngagementReporter:
         out.mkdir(parents=True, exist_ok=True)
         slug = self.engagement.name.lower().replace(" ", "_")
         paths: dict[str, Path] = {}
-        for ext, content in [("md", self.to_markdown()), ("html", self.to_html()), ("json", self.to_json())]:
+        for ext, content in [
+            ("md", self.to_markdown()),
+            ("html", self.to_html()),
+            ("json", self.to_json()),
+        ]:
             p = out / f"{slug}_{self.engagement.id}.{ext}"
             p.write_text(content, encoding="utf-8")
             paths[ext] = p

@@ -166,7 +166,9 @@ def cmd_generate(args: argparse.Namespace) -> int:
         )
         return 0
 
-    print(f"[*] Payloads for {vuln.value.upper()} (stack={result.stack.value}, waf={result.waf.value})")
+    print(
+        f"[*] Payloads for {vuln.value.upper()} (stack={result.stack.value}, waf={result.waf.value})"
+    )
     if not result.payloads:
         print("[~] No payloads available for this vulnerability type.")
         return 0

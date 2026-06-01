@@ -1,2 +1,1 @@
 """Reporting compatibility package."""
-

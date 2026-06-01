@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -35,9 +36,10 @@ class ScopeConfig:
     excluded — patterns that are explicitly OUT of scope even if they match allowed.
                e.g. ["admin.example.com", "*.cdn.example.com"]
     """
-    allowed:   list[str] = field(default_factory=list)
-    excluded:  list[str] = field(default_factory=list)
-    strict:    bool      = True    # if True, anything not explicitly allowed is blocked
+
+    allowed: list[str] = field(default_factory=list)
+    excluded: list[str] = field(default_factory=list)
+    strict: bool = True  # if True, anything not explicitly allowed is blocked
     log_violations: bool = True
 
     # ------------------------------------------------------------------ #
@@ -101,7 +103,9 @@ class ScopeEnforcer:
         return cls(ScopeConfig.from_yaml(path))
 
     @classmethod
-    def from_list(cls, targets: list[str], exclusions: Optional[list[str]] = None) -> "ScopeEnforcer":
+    def from_list(
+        cls, targets: list[str], exclusions: Optional[list[str]] = None
+    ) -> "ScopeEnforcer":
         return cls(ScopeConfig(allowed=targets, excluded=exclusions or []))
 
     # ------------------------------------------------------------------ #
@@ -124,7 +128,7 @@ class ScopeEnforcer:
         if self.config.strict:
             return self._violation(url, "not in allowed scope")
 
-        return True   # permissive mode: allow by default
+        return True  # permissive mode: allow by default
 
     def is_in_scope(self, url: str) -> bool:
         """Non-raising version of check()."""
