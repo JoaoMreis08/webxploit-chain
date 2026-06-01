@@ -44,7 +44,7 @@ Most web security tools treat vulnerabilities in isolation — a scanner finds X
 ## Installation
 
 ```bash
-git clone https://github.com/webxploit-chain/webxploit-chain.git
+git clone https://github.com/JoaoMreis08/webxploit-chain.git
 cd webxploit-chain
 pip install -e .
 
