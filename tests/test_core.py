@@ -639,7 +639,7 @@ def test_scope_enforcer_ip_range():
     # These should work depending on IP parsing logic
     try:
         enforcer.check("https://192.168.1.50/page")
-    except:
+    except Exception:
         pass  # IP parsing may not be perfect
 
 
@@ -970,7 +970,7 @@ def test_scope_enforcer_from_yaml_missing_file():
     from scope import ScopeEnforcer
 
     try:
-        enforcer = ScopeEnforcer.from_yaml("nonexistent.yaml")
+        ScopeEnforcer.from_yaml("nonexistent.yaml")
         assert False, "Should have raised an error"
     except (FileNotFoundError, Exception):
         pass
@@ -1128,7 +1128,7 @@ def test_payload_builder_payload_best():
     try:
         best = result.best()
         assert best is not None
-    except:
+    except Exception:
         # If best() doesn't exist, just verify result exists
         assert result is not None
 
@@ -1284,7 +1284,7 @@ def test_reporter_save_markdown():
     from reporter import MarkdownReporter
     from models import Engagement, Finding, VulnType, Severity, ExploitStatus
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory():
         engagement = Engagement(name="Test Export", operator="tester")
         finding = Finding(
             vuln_type=VulnType.XSS,
@@ -1308,7 +1308,7 @@ def test_reporter_save_html():
     from reporter import HTMLReporter
     from models import Engagement, Finding, VulnType, Severity, ExploitStatus
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory():
         engagement = Engagement(name="Test Export", operator="tester")
         finding = Finding(
             vuln_type=VulnType.SQLI,
@@ -1434,7 +1434,7 @@ def test_scope_enforcer_non_strict():
     # In non-strict mode, might behave differently
     try:
         enforcer.check("https://example.com/page")
-    except:
+    except Exception:
         pass
 
 
