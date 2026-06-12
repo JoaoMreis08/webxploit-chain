@@ -3,7 +3,6 @@
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -534,7 +533,6 @@ def test_full_engagement_workflow():
     """Test a complete engagement workflow."""
     from models import Finding, VulnType, Severity, ExploitStatus
     from webxploit.core.chain_engine import ChainEngine
-    from reporter import MarkdownReporter
 
     # Create findings
     f1 = Finding(
@@ -591,7 +589,7 @@ def test_payload_builder_all_types():
 
 def test_payload_builder_with_stack():
     """Test PayloadBuilder detects stack from HTTP response."""
-    from webxploit.payloads.builder import PayloadBuilder, TechStack
+    from webxploit.payloads.builder import PayloadBuilder
     from webxploit.core.models import VulnType
 
     builder = PayloadBuilder()
@@ -1283,8 +1281,6 @@ def test_reporter_finding_formatting():
 
 def test_reporter_save_markdown():
     """Test Reporter saves to markdown file."""
-    import tempfile
-    import os
     from reporter import MarkdownReporter
     from models import Engagement, Finding, VulnType, Severity, ExploitStatus
 
@@ -1309,7 +1305,6 @@ def test_reporter_save_markdown():
 
 def test_reporter_save_html():
     """Test Reporter saves to HTML file."""
-    import tempfile
     from reporter import HTMLReporter
     from models import Engagement, Finding, VulnType, Severity, ExploitStatus
 
@@ -1366,7 +1361,7 @@ def test_reporter_json_with_chains():
 
 def test_builder_waf_detection_cloudflare():
     """Test builder WAF detection for Cloudflare."""
-    from webxploit.payloads.builder import PayloadBuilder, WAFType
+    from webxploit.payloads.builder import PayloadBuilder
     from webxploit.core.models import VulnType
 
     builder = PayloadBuilder()
@@ -1378,7 +1373,7 @@ def test_builder_waf_detection_cloudflare():
 
 def test_builder_waf_detection_modsecurity():
     """Test builder WAF detection for ModSecurity."""
-    from webxploit.payloads.builder import PayloadBuilder, WAFType
+    from webxploit.payloads.builder import PayloadBuilder
     from webxploit.core.models import VulnType
 
     builder = PayloadBuilder()
@@ -1450,7 +1445,7 @@ def test_scope_enforcer_non_strict():
 
 def test_complete_red_team_workflow():
     """Test a complete red team engagement workflow."""
-    from models import Engagement, Finding, VulnChain, ChainLink, VulnType, Severity, ExploitStatus
+    from models import Engagement, Finding, VulnType, Severity, ExploitStatus
     from webxploit.core.chain_engine import ChainEngine
     from reporter import MarkdownReporter, HTMLReporter, JSONReporter
     from scope import ScopeEnforcer, ScopeConfig
@@ -1520,7 +1515,7 @@ def test_complete_red_team_workflow():
 
 def test_models_direct_import():
     """Test importing models directly."""
-    from models import Finding, Severity, VulnType, ExploitStatus, ChainLink, VulnChain, Engagement
+    from models import Finding, Severity
 
     assert Finding is not None
     assert Severity is not None
@@ -1536,7 +1531,7 @@ def test_chain_engine_direct_import():
 
 def test_builder_direct_import():
     """Test importing builder directly."""
-    from builder import PayloadBuilder, TechStack, WAFType
+    from builder import PayloadBuilder, TechStack
 
     assert PayloadBuilder is not None
     assert TechStack is not None
@@ -1544,7 +1539,7 @@ def test_builder_direct_import():
 
 def test_scope_direct_import():
     """Test importing scope directly."""
-    from scope import ScopeEnforcer, ScopeConfig, ScopeViolation
+    from scope import ScopeEnforcer, ScopeConfig
 
     assert ScopeEnforcer is not None
     assert ScopeConfig is not None
@@ -1552,7 +1547,7 @@ def test_scope_direct_import():
 
 def test_reporter_direct_import():
     """Test importing reporter directly."""
-    from reporter import MarkdownReporter, HTMLReporter, JSONReporter
+    from reporter import MarkdownReporter, HTMLReporter
 
     assert MarkdownReporter is not None
     assert HTMLReporter is not None
