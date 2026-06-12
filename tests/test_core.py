@@ -150,7 +150,14 @@ def test_chain_link_creation():
 
 def test_vuln_chain_creation():
     """Test VulnChain creation."""
-    from webxploit.core.models import VulnChain, ChainLink, Finding, VulnType, Severity, ExploitStatus
+    from webxploit.core.models import (
+        VulnChain,
+        ChainLink,
+        Finding,
+        VulnType,
+        Severity,
+        ExploitStatus,
+    )
 
     f1 = Finding(
         vuln_type=VulnType.XSS,
@@ -1051,7 +1058,7 @@ def test_engagement_with_multiple_chains():
     link2 = ChainLink(finding=f2, step_number=2, depends_on=[f1.id])
 
     chain1 = VulnChain(name="XSS→CSRF", links=[link1, link2], severity=Severity.CRITICAL)
-    
+
     link3 = ChainLink(finding=f1, step_number=1, action="Different action")
     chain2 = VulnChain(name="XSS→RCE", links=[link3], severity=Severity.CRITICAL)
 
@@ -1123,7 +1130,7 @@ def test_payload_builder_payload_best():
 
     builder = PayloadBuilder()
     result = builder.build(VulnType.XSS)
-    
+
     # Result should have a best() method or similar
     try:
         best = result.best()
@@ -1144,7 +1151,7 @@ def test_chain_engine_xss_csrf_chain():
     from webxploit.core.models import Finding, VulnType, Severity, ExploitStatus
 
     engine = ChainEngine()
-    
+
     findings = [
         Finding(
             vuln_type=VulnType.XSS,
@@ -1174,7 +1181,7 @@ def test_chain_engine_sqli_auth_bypass_chain():
     from webxploit.core.models import Finding, VulnType, Severity, ExploitStatus
 
     engine = ChainEngine()
-    
+
     findings = [
         Finding(
             vuln_type=VulnType.SQLI,
@@ -1203,7 +1210,7 @@ def test_chain_engine_lfi_disclosure_chain():
     from webxploit.core.models import Finding, VulnType, Severity, ExploitStatus
 
     engine = ChainEngine()
-    
+
     findings = [
         Finding(
             vuln_type=VulnType.LFI,
@@ -1333,7 +1340,7 @@ def test_reporter_json_with_chains():
     from models import Engagement, VulnChain, ChainLink, Finding, VulnType, Severity, ExploitStatus
 
     engagement = Engagement(name="Test", operator="tester")
-    
+
     finding = Finding(
         vuln_type=VulnType.XSS,
         url="https://example.com/search",
@@ -1365,7 +1372,7 @@ def test_builder_waf_detection_cloudflare():
     from webxploit.core.models import VulnType
 
     builder = PayloadBuilder()
-    
+
     # Builder can detect WAFs from response
     result = builder.build(VulnType.XSS)
     assert result is not None
@@ -1377,7 +1384,7 @@ def test_builder_waf_detection_modsecurity():
     from webxploit.core.models import VulnType
 
     builder = PayloadBuilder()
-    
+
     result = builder.build(VulnType.SQLI)
     assert result is not None
 
@@ -1619,7 +1626,7 @@ def test_engagement_with_start_end_time():
     from models import Engagement
 
     eng = Engagement(name="Test", operator="tester")
-    
+
     assert eng.start_time is not None
     assert eng.end_time is None
 
