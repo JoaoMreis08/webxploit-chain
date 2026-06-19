@@ -459,7 +459,6 @@ class ChainGraph:
         self._adj.setdefault(edge.source, []).append(edge)
         logger.info("Custom chain edge added: %s → %s", edge.source.value, edge.target.value)
 
-
     def load_custom_rules(self, path: str | Path) -> None:
         """Load user-defined chain rules from a YAML or JSON file."""
         rules_path = Path(path)
@@ -467,7 +466,11 @@ class ChainGraph:
             raise FileNotFoundError(f"Custom rules file not found: {rules_path}")
 
         raw_text = rules_path.read_text(encoding="utf-8")
-        raw = json.loads(raw_text) if rules_path.suffix.lower() == ".json" else yaml.safe_load(raw_text)
+        raw = (
+            json.loads(raw_text)
+            if rules_path.suffix.lower() == ".json"
+            else yaml.safe_load(raw_text)
+        )
         entries = raw.get("rules", raw) if isinstance(raw, dict) else raw
         if not isinstance(entries, list):
             raise ValueError("Custom chain rules must be a list or a mapping with a 'rules' list")

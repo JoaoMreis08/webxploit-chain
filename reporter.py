@@ -253,13 +253,21 @@ def _inline_markdown(text: str) -> str:
         end = escaped.find("**", start + 2)
         if end == -1:
             break
-        escaped = escaped[:start] + "<strong>" + escaped[start + 2 : end] + "</strong>" + escaped[end + 2 :]
+        escaped = (
+            escaped[:start]
+            + "<strong>"
+            + escaped[start + 2 : end]
+            + "</strong>"
+            + escaped[end + 2 :]
+        )
     while "`" in escaped:
         start = escaped.find("`")
         end = escaped.find("`", start + 1)
         if end == -1:
             break
-        escaped = escaped[:start] + "<code>" + escaped[start + 1 : end] + "</code>" + escaped[end + 1 :]
+        escaped = (
+            escaped[:start] + "<code>" + escaped[start + 1 : end] + "</code>" + escaped[end + 1 :]
+        )
     return escaped
 
 
@@ -325,7 +333,11 @@ def _markdown_to_html(markdown: str) -> str:
                 in_table = True
                 table_row_count = 0
             tag = "th" if table_row_count == 0 else "td"
-            html.append("<tr>" + "".join(f"<{tag}>{_inline_markdown(cell)}</{tag}>" for cell in cells) + "</tr>")
+            html.append(
+                "<tr>"
+                + "".join(f"<{tag}>{_inline_markdown(cell)}</{tag}>" for cell in cells)
+                + "</tr>"
+            )
             table_row_count += 1
             continue
 
