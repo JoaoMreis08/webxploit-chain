@@ -62,8 +62,8 @@ pip install -e ".[graph]"    # for networkx-based path analysis
 ### 1. Run the chain engine on your findings
 
 ```bash
-# Write your findings to a JSON file (see configs/example_findings.json)
-webxploit chain configs/example_findings.json
+# Write your findings to a JSON file (see example_findings.json)
+webxploit chain example_findings.json --top 5 --min-confidence 0.85
 ```
 
 Output:
@@ -73,14 +73,14 @@ Output:
 
 [*] Loaded 5 findings. Running chain engine...
 
-[+] 7 chain(s) identified:
+[+] 5 chain(s) identified:
 
-  1. XSS → CSRF chain
-     Score: 0.87  |  Confidence: 90%  |  Severity: high
-     Starting with XSS as initial access. → Weaponise XSS to forge authenticated requests...
+  1. IDOR -> INFO_DISCLOSURE -> AUTH_BYPASS
+     Score: 0.91  |  Confidence: 90%  |  Severity: critical
+     Starting with IDOR as initial access. -> Access other users' data via IDOR...
 
-  2. INFO_DISCLOSURE → AUTH_BYPASS chain
-     Score: 0.82  |  Confidence: 85%  |  Severity: critical
+  2. SQLI -> INFO_DISCLOSURE -> AUTH_BYPASS
+     Score: 0.91  |  Confidence: 90%  |  Severity: critical
      ...
 ```
 
@@ -92,7 +92,7 @@ webxploit scope configs/scope.yaml https://app.target.org/login
 # [+] IN SCOPE: https://app.target.org/login
 
 webxploit scope configs/scope.yaml https://evil.com/steal
-# [-] OUT OF SCOPE: 'https://evil.com/steal' — not in allowed scope
+# [-] OUT OF SCOPE: 'https://evil.com/steal' - not in allowed scope
 ```
 
 ### 3. Generate payloads
@@ -106,11 +106,17 @@ webxploit payload ssti                 # template injection
 ### 4. Generate a full engagement report
 
 ```bash
-webxploit report configs/example_findings.json reports/
+webxploit report example_findings.json reports/ --include-chains
 # [+] Reports saved:
-#     MD   → reports/my_engagement_a1b2c3.md
-#     HTML → reports/my_engagement_a1b2c3.html
-#     JSON → reports/my_engagement_a1b2c3.json
+#     MD    -> reports/my_engagement_a1b2c3.md
+#     HTML  -> reports/my_engagement_a1b2c3.html
+#     JSON  -> reports/my_engagement_a1b2c3.json
+```
+
+### 5. Add custom chain rules
+
+```bash
+webxploit chain example_findings.json --rules configs/custom_chains.yaml
 ```
 
 ---

@@ -1,7 +1,6 @@
 """Comprehensive test suite for WebXploit Chain."""
 
 import sys
-import tempfile
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -185,7 +184,7 @@ def test_vuln_chain_creation():
     )
 
     assert len(chain.links) == 2
-    assert chain.chain_label == "XSS → CSRF"
+    assert chain.chain_label == "XSS -> CSRF"
 
 
 # ========================================================================
@@ -273,6 +272,18 @@ def test_chain_edge_to_dict():
     assert data["from"] == "xss"
     assert data["to"] == "csrf"
     assert data["confidence"] == 0.85
+
+
+def test_chain_graph_loads_custom_rules():
+    """Test ChainGraph can load custom YAML rules."""
+    from webxploit.core.chain_engine import ChainGraph
+    from webxploit.core.models import VulnType
+
+    rules_path = Path(__file__).parent.parent / "configs" / "custom_chains.yaml"
+    graph = ChainGraph(custom_rules_path=str(rules_path))
+
+    targets = [edge.target for edge in graph.edges_from(VulnType.OPEN_REDIRECT)]
+    assert VulnType.INFO_DISCLOSURE in targets
 
 
 # ========================================================================
@@ -1291,23 +1302,22 @@ def test_reporter_save_markdown():
     from reporter import MarkdownReporter
     from models import Engagement, Finding, VulnType, Severity, ExploitStatus
 
-    with tempfile.TemporaryDirectory():
-        engagement = Engagement(name="Test Export", operator="tester")
-        finding = Finding(
-            vuln_type=VulnType.XSS,
-            url="https://example.com/search",
-            parameter="q",
-            severity=Severity.HIGH,
-            status=ExploitStatus.CONFIRMED,
-        )
-        engagement.add_finding(finding)
+    engagement = Engagement(name="Test Export", operator="tester")
+    finding = Finding(
+        vuln_type=VulnType.XSS,
+        url="https://example.com/search",
+        parameter="q",
+        severity=Severity.HIGH,
+        status=ExploitStatus.CONFIRMED,
+    )
+    engagement.add_finding(finding)
 
-        reporter = MarkdownReporter()
-        output = reporter.generate(engagement)
+    reporter = MarkdownReporter()
+    output = reporter.generate(engagement)
 
-        # Verify output is generated
-        assert "Test Export" in output
-        assert len(output) > 0
+    # Verify output is generated
+    assert "Test Export" in output
+    assert len(output) > 0
 
 
 def test_reporter_save_html():
@@ -1315,23 +1325,22 @@ def test_reporter_save_html():
     from reporter import HTMLReporter
     from models import Engagement, Finding, VulnType, Severity, ExploitStatus
 
-    with tempfile.TemporaryDirectory():
-        engagement = Engagement(name="Test Export", operator="tester")
-        finding = Finding(
-            vuln_type=VulnType.SQLI,
-            url="https://example.com/api",
-            parameter="id",
-            severity=Severity.CRITICAL,
-            status=ExploitStatus.CONFIRMED,
-        )
-        engagement.add_finding(finding)
+    engagement = Engagement(name="Test Export", operator="tester")
+    finding = Finding(
+        vuln_type=VulnType.SQLI,
+        url="https://example.com/api",
+        parameter="id",
+        severity=Severity.CRITICAL,
+        status=ExploitStatus.CONFIRMED,
+    )
+    engagement.add_finding(finding)
 
-        reporter = HTMLReporter()
-        output = reporter.generate(engagement)
+    reporter = HTMLReporter()
+    output = reporter.generate(engagement)
 
-        # Verify HTML output
-        assert isinstance(output, str)
-        assert len(output) > 0
+    # Verify HTML output
+    assert isinstance(output, str)
+    assert len(output) > 0
 
 
 def test_reporter_json_with_chains():

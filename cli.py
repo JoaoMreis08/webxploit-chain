@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from builder import Fingerprinter, FingerprintResult, PayloadBuilder, TechStack, WAFType
-from chain_engine import ChainEngine
+from chain_engine import ChainEngine, ChainGraph
 from http_automation import HTTPTester, PayloadTestResult
 from models import Engagement, ExploitStatus, Finding, Severity, VulnType
 from reporter import EngagementReporter
@@ -228,11 +228,21 @@ def cmd_chain(args: argparse.Namespace) -> int:
     if not findings:
         print("[!] No valid findings loaded.", file=sys.stderr)
         return 1
+    if args.top is not None and args.top < 1:
+        print("[!] --top must be greater than zero.", file=sys.stderr)
+        return 1
 
-    results = ChainEngine(max_depth=args.max_depth).analyse(
-        findings,
-        min_confidence=args.min_confidence,
-    )
+    try:
+        graph = ChainGraph(custom_rules_path=args.rules) if args.rules else None
+        results = ChainEngine(graph=graph, max_depth=args.max_depth).analyse(
+            findings,
+            min_confidence=args.min_confidence,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    if args.top:
+        results = results[: args.top]
     if args.json:
         _print_json(
             [
@@ -281,7 +291,13 @@ def cmd_report(args: argparse.Namespace) -> int:
     for finding in _load_findings(path):
         engagement.add_finding(finding)
     if args.include_chains:
-        for result in ChainEngine().analyse(engagement.findings):
+        try:
+            graph = ChainGraph(custom_rules_path=args.rules) if args.rules else None
+            results = ChainEngine(graph=graph).analyse(engagement.findings)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"[!] {exc}", file=sys.stderr)
+            return 1
+        for result in results:
             engagement.add_chain(result.chain)
 
     paths = EngagementReporter(engagement).save_all(args.output_dir)
@@ -343,6 +359,8 @@ def build_parser() -> argparse.ArgumentParser:
     chain.add_argument("findings")
     chain.add_argument("--min-confidence", type=float, default=0.5)
     chain.add_argument("--max-depth", type=int, default=4)
+    chain.add_argument("--top", type=int, help="show only the top N ranked chains")
+    chain.add_argument("--rules", help="load additional chain rules from YAML or JSON")
     chain.add_argument("--json", action="store_true")
     chain.set_defaults(func=cmd_chain)
 
@@ -350,6 +368,7 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("engagement")
     report.add_argument("output_dir", nargs="?", default="reports")
     report.add_argument("--include-chains", action="store_true")
+    report.add_argument("--rules", help="load additional chain rules from YAML or JSON")
     report.set_defaults(func=cmd_report)
 
     scope = subparsers.add_parser("scope", help="validate URL against scope.yaml")

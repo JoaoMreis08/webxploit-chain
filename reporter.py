@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import textwrap
 from datetime import datetime
+from html import escape
 from pathlib import Path
 
 from webxploit.core.models import Engagement, Finding, Severity, VulnChain
@@ -30,19 +31,27 @@ from webxploit.core.models import Engagement, Finding, Severity, VulnChain
 # ---------------------------------------------------------------------------
 
 _CVSS_REFERENCE = {
-    Severity.CRITICAL: "9.0–10.0",
-    Severity.HIGH: "7.0–8.9",
-    Severity.MEDIUM: "4.0–6.9",
-    Severity.LOW: "0.1–3.9",
+    Severity.CRITICAL: "9.0-10.0",
+    Severity.HIGH: "7.0-8.9",
+    Severity.MEDIUM: "4.0-6.9",
+    Severity.LOW: "0.1-3.9",
     Severity.INFO: "0.0",
 }
 
+_CVSS_ESTIMATE = {
+    Severity.CRITICAL: 9.4,
+    Severity.HIGH: 8.1,
+    Severity.MEDIUM: 5.4,
+    Severity.LOW: 2.7,
+    Severity.INFO: 0.0,
+}
+
 _SEVERITY_EMOJI = {
-    Severity.CRITICAL: "🔴",
-    Severity.HIGH: "🟠",
-    Severity.MEDIUM: "🟡",
-    Severity.LOW: "🔵",
-    Severity.INFO: "⚪",
+    Severity.CRITICAL: "[CRITICAL]",
+    Severity.HIGH: "[HIGH]",
+    Severity.MEDIUM: "[MEDIUM]",
+    Severity.LOW: "[LOW]",
+    Severity.INFO: "[INFO]",
 }
 
 _REMEDIATION_HINTS: dict[str, str] = {
@@ -86,7 +95,7 @@ class MarkdownReporter:
     def _header(self, e: Engagement) -> str:
         now = datetime.utcnow().strftime("%Y-%m-%d")
         return textwrap.dedent(f"""\
-            # {e.name} — Penetration Test Report
+            # {e.name} - Penetration Test Report
 
             | Field       | Value                   |
             |-------------|-------------------------|
@@ -153,12 +162,13 @@ class MarkdownReporter:
         if f.cvss_score:
             cvss_key, cvss_val = "CVSS", str(f.cvss_score)
         else:
-            cvss_key, cvss_val = "CVSS Range", _CVSS_REFERENCE[f.severity]
+            cvss_key = "CVSS Estimate"
+            cvss_val = f"{_CVSS_ESTIMATE[f.severity]:.1f} ({_CVSS_REFERENCE[f.severity]})"
         remediation = _REMEDIATION_HINTS.get(f.vuln_type.value, "_Review vendor guidance._")
         payload_block = f"\n```\n{f.payload}\n```" if f.payload else ""
         evidence_block = f"\n**Evidence:**\n```\n{f.evidence}\n```" if f.evidence else ""
         return textwrap.dedent(f"""\
-            ### [{f.id}] {_SEVERITY_EMOJI[f.severity]} {f.vuln_type.value.upper()} — {f.severity.value.capitalize()}
+            ### [{f.id}] {_SEVERITY_EMOJI[f.severity]} {f.vuln_type.value.upper()} - {f.severity.value.capitalize()}
 
             | Field     | Value              |
             |-----------|--------------------|
@@ -224,7 +234,7 @@ class MarkdownReporter:
     def _appendix(self, e: Engagement) -> str:
         if not any(f.request or f.response for f in e.findings):
             return ""
-        blocks = ["## Appendix — Raw Evidence\n"]
+        blocks = ["## Appendix - Raw Evidence\n"]
         for f in e.findings:
             if f.request or f.response:
                 blocks.append(f"### Finding {f.id}\n")
@@ -233,6 +243,117 @@ class MarkdownReporter:
                 if f.response:
                     blocks.append(f"**Response (excerpt):**\n```\n{f.response}\n```\n")
         return "\n".join(blocks)
+
+
+def _inline_markdown(text: str) -> str:
+    """Render the small subset of inline Markdown produced by this reporter."""
+    escaped = escape(text)
+    while "**" in escaped:
+        start = escaped.find("**")
+        end = escaped.find("**", start + 2)
+        if end == -1:
+            break
+        escaped = escaped[:start] + "<strong>" + escaped[start + 2 : end] + "</strong>" + escaped[end + 2 :]
+    while "`" in escaped:
+        start = escaped.find("`")
+        end = escaped.find("`", start + 1)
+        if end == -1:
+            break
+        escaped = escaped[:start] + "<code>" + escaped[start + 1 : end] + "</code>" + escaped[end + 1 :]
+    return escaped
+
+
+def _markdown_to_html(markdown: str) -> str:
+    """Convert the project-generated Markdown report to self-contained HTML."""
+    html: list[str] = []
+    lines = markdown.splitlines()
+    in_code = False
+    code_lines: list[str] = []
+    in_list = False
+    in_table = False
+    table_row_count = 0
+
+    def close_list() -> None:
+        nonlocal in_list
+        if in_list:
+            html.append("</ul>")
+            in_list = False
+
+    def close_table() -> None:
+        nonlocal in_table, table_row_count
+        if in_table:
+            html.append("</tbody></table>")
+            in_table = False
+            table_row_count = 0
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            if in_code:
+                html.append("<pre><code>" + escape("\n".join(code_lines)) + "</code></pre>")
+                code_lines = []
+                in_code = False
+            else:
+                close_list()
+                close_table()
+                in_code = True
+            continue
+
+        if in_code:
+            code_lines.append(line)
+            continue
+
+        if not stripped:
+            close_list()
+            close_table()
+            continue
+
+        if stripped == "---":
+            close_list()
+            close_table()
+            html.append("<hr>")
+            continue
+
+        if stripped.startswith("|") and stripped.endswith("|"):
+            cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+            if all(set(cell) <= {"-"} for cell in cells):
+                continue
+            if not in_table:
+                close_list()
+                html.append("<table><tbody>")
+                in_table = True
+                table_row_count = 0
+            tag = "th" if table_row_count == 0 else "td"
+            html.append("<tr>" + "".join(f"<{tag}>{_inline_markdown(cell)}</{tag}>" for cell in cells) + "</tr>")
+            table_row_count += 1
+            continue
+
+        close_table()
+
+        if stripped.startswith("# "):
+            close_list()
+            html.append(f"<h1>{_inline_markdown(stripped[2:])}</h1>")
+        elif stripped.startswith("## "):
+            close_list()
+            html.append(f"<h2>{_inline_markdown(stripped[3:])}</h2>")
+        elif stripped.startswith("### "):
+            close_list()
+            html.append(f"<h3>{_inline_markdown(stripped[4:])}</h3>")
+        elif stripped.startswith("- "):
+            if not in_list:
+                html.append("<ul>")
+                in_list = True
+            html.append(f"<li>{_inline_markdown(stripped[2:])}</li>")
+        else:
+            close_list()
+            html.append(f"<p>{_inline_markdown(stripped)}</p>")
+
+    close_list()
+    close_table()
+    if in_code:
+        html.append("<pre><code>" + escape("\n".join(code_lines)) + "</code></pre>")
+    return "\n".join(html)
 
 
 # ---------------------------------------------------------------------------
@@ -245,36 +366,34 @@ class HTMLReporter:
 
     def generate(self, engagement: Engagement) -> str:
         md_content = MarkdownReporter().generate(engagement)
-        # Escape for safety inside the HTML template
-        escaped = md_content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        body = _markdown_to_html(md_content)
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{engagement.name} — Report</title>
+<title>{escape(engagement.name)} - Report</title>
 <style>
-  body {{ font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; line-height: 1.6; }}
-  h1 {{ border-bottom: 2px solid #e53e3e; padding-bottom: .5rem; }}
-  h2 {{ border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2rem; }}
-  h3 {{ color: #2d3748; }}
+  :root {{ color-scheme: light; }}
+  body {{ font-family: "Segoe UI", system-ui, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1.25rem; color: #172033; line-height: 1.6; background: #ffffff; }}
+  h1 {{ border-bottom: 3px solid #b91c1c; padding-bottom: .55rem; margin-bottom: 1.25rem; }}
+  h2 {{ border-bottom: 1px solid #cbd5e1; padding-bottom: .3rem; margin-top: 2.25rem; }}
+  h3 {{ color: #1f2937; margin-top: 1.5rem; }}
   table {{ border-collapse: collapse; width: 100%; margin: 1rem 0; }}
-  th, td {{ border: 1px solid #ddd; padding: .5rem .75rem; text-align: left; }}
-  th {{ background: #f7fafc; }}
-  code {{ background: #f4f4f4; padding: .1em .3em; border-radius: 3px; font-size: .9em; }}
-  pre {{ background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; }}
+  th, td {{ border: 1px solid #d7dde8; padding: .55rem .75rem; text-align: left; vertical-align: top; }}
+  th {{ background: #f1f5f9; }}
+  code {{ background: #eef2f7; padding: .1em .35em; border-radius: 4px; font-size: .92em; }}
+  pre {{ background: #111827; color: #e5e7eb; padding: 1rem; border-radius: 6px; overflow-x: auto; }}
   pre code {{ background: none; color: inherit; padding: 0; }}
-  hr {{ border: none; border-top: 1px solid #eee; margin: 2rem 0; }}
-  .badge-critical {{ color: #fff; background: #e53e3e; padding: 2px 8px; border-radius: 12px; font-size: .8em; }}
-  .badge-high {{ color: #fff; background: #dd6b20; padding: 2px 8px; border-radius: 12px; font-size: .8em; }}
-  .badge-medium {{ color: #fff; background: #d69e2e; padding: 2px 8px; border-radius: 12px; font-size: .8em; }}
-  .badge-low {{ color: #fff; background: #3182ce; padding: 2px 8px; border-radius: 12px; font-size: .8em; }}
+  hr {{ border: none; border-top: 1px solid #e5e7eb; margin: 2rem 0; }}
+  ul, ol {{ padding-left: 1.4rem; }}
+  footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; font-size: .85em; color: #64748b; }}
 </style>
 </head>
 <body>
-<pre style="white-space:pre-wrap;font-family:inherit;background:none;color:inherit;padding:0;">{escaped}</pre>
-<footer style="margin-top:3rem;padding-top:1rem;border-top:1px solid #eee;font-size:.8em;color:#718096;">
-  Generated by WebXploit Chain &mdash; {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}
+{body}
+<footer>
+  Generated by WebXploit Chain - {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}
 </footer>
 </body>
 </html>"""

@@ -21,9 +21,13 @@ added to the Engagement.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
+
+import yaml
 
 from webxploit.core.models import (
     ChainLink,
@@ -208,7 +212,7 @@ _CHAIN_RULES: list[tuple[VulnType, VulnType, dict]] = [
         {
             "description": "Access other users' data via IDOR to exfiltrate PII or sensitive records.",
             "chain_action": "Enumerate object IDs to access unauthorised user data.",
-            "payload_hint": "GET /api/users/{id}/profile — try sequential or UUID enumeration",
+            "payload_hint": "GET /api/users/{id}/profile - try sequential or UUID enumeration",
             "prerequisites": [],
             "severity_bump": 1,
             "confidence": 0.95,
@@ -289,7 +293,7 @@ _CHAIN_RULES: list[tuple[VulnType, VulnType, dict]] = [
         {
             "description": "Use admin access gained via auth bypass to deploy a webshell or RCE vector.",
             "chain_action": "Upload webshell via admin file manager, or execute OS commands via admin panel.",
-            "payload_hint": "POST /admin/upload — multipart/form-data with shell.php",
+            "payload_hint": "POST /admin/upload - multipart/form-data with shell.php",
             "prerequisites": ["admin functionality with file upload or command execution"],
             "severity_bump": 3,
             "confidence": 0.7,
@@ -315,7 +319,7 @@ _CHAIN_RULES: list[tuple[VulnType, VulnType, dict]] = [
         VulnType.XXE,
         VulnType.SSRF,
         {
-            "description": "Use XXE external entity to reach internal services (OOB-XXE → SSRF).",
+            "description": "Use XXE external entity to reach internal services (OOB-XXE to SSRF).",
             "chain_action": "Define external entity pointing to internal IP or metadata endpoint.",
             "payload_hint": '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/">]><foo>&xxe;</foo>',
             "prerequisites": ["XML parser with external entity processing enabled"],
@@ -391,6 +395,14 @@ def _bump_severity(base: Severity, bump: int) -> Severity:
     return levels[min(idx + bump, len(levels) - 1)]
 
 
+def _parse_vuln_type(value: object) -> VulnType:
+    try:
+        return VulnType(str(value).lower())
+    except ValueError as exc:
+        valid = ", ".join(v.value for v in VulnType)
+        raise ValueError(f"Invalid vuln type {value!r}. Valid values: {valid}") from exc
+
+
 # ---------------------------------------------------------------------------
 # Chain graph
 # ---------------------------------------------------------------------------
@@ -403,10 +415,12 @@ class ChainGraph:
     Falls back to networkx for path enumeration if available.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, custom_rules_path: Optional[str] = None) -> None:
         # adjacency: source → list[ChainEdge]
         self._adj: dict[VulnType, list[ChainEdge]] = {}
         self._build_from_rules()
+        if custom_rules_path:
+            self.load_custom_rules(custom_rules_path)
 
     def _build_from_rules(self) -> None:
         for src, tgt, meta in _CHAIN_RULES:
@@ -444,6 +458,35 @@ class ChainGraph:
         """Register a user-defined chain edge at runtime."""
         self._adj.setdefault(edge.source, []).append(edge)
         logger.info("Custom chain edge added: %s → %s", edge.source.value, edge.target.value)
+
+
+    def load_custom_rules(self, path: str | Path) -> None:
+        """Load user-defined chain rules from a YAML or JSON file."""
+        rules_path = Path(path)
+        if not rules_path.exists():
+            raise FileNotFoundError(f"Custom rules file not found: {rules_path}")
+
+        raw_text = rules_path.read_text(encoding="utf-8")
+        raw = json.loads(raw_text) if rules_path.suffix.lower() == ".json" else yaml.safe_load(raw_text)
+        entries = raw.get("rules", raw) if isinstance(raw, dict) else raw
+        if not isinstance(entries, list):
+            raise ValueError("Custom chain rules must be a list or a mapping with a 'rules' list")
+
+        for item in entries:
+            if not isinstance(item, dict):
+                raise ValueError("Each custom chain rule must be an object")
+            edge = ChainEdge(
+                source=_parse_vuln_type(item["from"]),
+                target=_parse_vuln_type(item["to"]),
+                description=str(item.get("description", "")),
+                prerequisites=list(item.get("prerequisites", [])),
+                chain_action=str(item.get("chain_action", "")),
+                payload_hint=str(item.get("payload_hint", "")),
+                severity_bump=int(item.get("severity_bump", 0)),
+                confidence=float(item.get("confidence", 0.8)),
+                tags=list(item.get("tags", [])),
+            )
+            self.add_custom_edge(edge)
 
 
 # ---------------------------------------------------------------------------
@@ -602,7 +645,7 @@ class ChainEngine:
                     url=start_finding.url,
                     parameter=None,
                     severity=_bump_severity(start_finding.severity, edge.severity_bump),
-                    evidence=f"Chained from {edge.source.value} — not yet confirmed",
+                    evidence=f"Chained from {edge.source.value} - not yet confirmed",
                     payload=edge.payload_hint,
                 )
 
@@ -621,7 +664,7 @@ class ChainEngine:
         chain_severity = _bump_severity(base_severity, min(total_bump, 4))
 
         # Compose chain name
-        chain_label = " → ".join(t.value.upper() for t in all_types)
+        chain_label = " -> ".join(t.value.upper() for t in all_types)
         chain_name = f"{chain_label} chain"
 
         # Human-readable reasoning
@@ -650,13 +693,13 @@ class ChainEngine:
     def _build_reasoning(self, edge_path: list[ChainEdge], start: VulnType) -> str:
         parts = [f"Starting with {start.value.upper()} as initial access."]
         for edge in edge_path:
-            parts.append(f"→ {edge.description}")
+            parts.append(f"-> {edge.description}")
         return " ".join(parts)
 
     def _impact_statement(self, edge_path: list[ChainEdge], severity: Severity) -> str:
         terminal = edge_path[-1].target if edge_path else None
         impact_map = {
-            VulnType.RCE: "Full server compromise — arbitrary OS command execution.",
+            VulnType.RCE: "Full server compromise - arbitrary OS command execution.",
             VulnType.AUTH_BYPASS: "Unauthorised access to protected functionality or accounts.",
             VulnType.PRIV_ESC: "Elevation to administrative/root privileges.",
             VulnType.INFO_DISCLOSURE: "Exposure of sensitive data (credentials, PII, configuration).",

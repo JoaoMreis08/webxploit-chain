@@ -138,7 +138,7 @@ class VulnChain:
 
     @property
     def chain_label(self) -> str:
-        return " → ".join(vt.value.upper() for vt in self.vuln_types)
+        return " -> ".join(vt.value.upper() for vt in self.vuln_types)
 
     def to_dict(self) -> dict[str, Any]:
         return {
