@@ -1,6 +1,6 @@
 # WebXploit Chain
 
-> **Web exploitation framework for red team engagements** — vulnerability chaining, context-aware payloads, scope enforcement, and engagement-oriented reporting.
+> **Attack Path Analysis and Engagement Automation Framework for Web Application Security Assessments** — vulnerability chaining, context-aware payloads, scope enforcement, and engagement-oriented reporting.
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
